@@ -276,10 +276,12 @@ class Scope extends EventEmitter {
     )
   }
 
-  buildFilter() {
-    const filteringArguments = Array.from(arguments) as any[]
-
-    if (arguments[0] instanceof RegExp) {
+  /** @internal */
+  buildFilter(
+    filter: RegExp | ((...args: any[]) => string),
+    replacement?: string,
+  ) {
+    if (filter instanceof RegExp) {
       return function (candidate: string) {
         /* istanbul ignore if */
         if (typeof candidate !== 'string') {
@@ -287,15 +289,20 @@ class Scope extends EventEmitter {
             `Nock internal assertion failed: typeof candidate is ${typeof candidate}. If you encounter this error, please report it as a bug.`,
           )
         }
-        return candidate.replace(filteringArguments[0], filteringArguments[1])
+        return candidate.replace(filter, replacement as string)
       }
-    } else if (typeof arguments[0] === 'function') {
-      return arguments[0]
+    } else if (typeof filter === 'function') {
+      return filter
     }
   }
 
-  filteringPath() {
-    this.transformPathFunction = this.buildFilter.apply(this, arguments as any)
+  filteringPath(regex: RegExp, replace: string): this
+  filteringPath(fn: (path: string) => string): this
+  filteringPath(
+    filter: RegExp | ((path: string) => string),
+    replace?: string,
+  ): this {
+    this.transformPathFunction = this.buildFilter(filter, replace) ?? null
     if (!this.transformPathFunction) {
       throw new Error(
         'Invalid arguments: filtering path should be a function or a regular expression',
@@ -304,11 +311,14 @@ class Scope extends EventEmitter {
     return this
   }
 
-  filteringRequestBody() {
-    this.transformRequestBodyFunction = this.buildFilter.apply(
-      this,
-      arguments as any,
-    )
+  filteringRequestBody(regex: RegExp, replace: string): this
+  filteringRequestBody(fn: (body: string, recordedBody: string) => string): this
+  filteringRequestBody(
+    filter: RegExp | ((body: string, recordedBody: string) => string),
+    replace?: string,
+  ): this {
+    this.transformRequestBodyFunction =
+      this.buildFilter(filter, replace) ?? null
     if (!this.transformRequestBodyFunction) {
       throw new Error(
         'Invalid arguments: filtering request body should be a function or a regular expression',
